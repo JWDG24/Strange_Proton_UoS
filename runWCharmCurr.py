@@ -20,9 +20,23 @@ from array import array
 WEIGHT_DIR = "/mnt/c/Users/dugar/wcharm_analysis/weights"
 
 # ------------------------------------------------------------
-# Requested weight indices
+# --- Weight configuration switch ---
+# If True  → run all weights in used_weights
+# If False → run only default weight (index 0)
 # ------------------------------------------------------------
+USE_ALL_WEIGHTS = False
+
+# Requested weight indices
 used_weights = [0, 292, 293, 314, 315]
+
+
+# ------------------------------------------------------------
+# --- Kristin eta binning implementation ---
+# Variable bin edges for |eta|
+# Histogram will be filled with fabs(eta)
+# ------------------------------------------------------------
+bins = sorted([0, 0.21, 0.42, 0.63, 0.84, 1.05, 1.37, 1.52, 1.74, 1.95, 2.18, 2.5])
+binArray = array('d', bins)
 
 
 # ------------------------------------------------------------
@@ -112,20 +126,26 @@ for SignalSample in SignalSamples:
     mytree = tfile.Get("WCharmTree")
     allevents = mytree.GetEntries()
 
+    # ------------------------------------------------------------
+    # --- Choose which weights to run based on boolean ---
+    # ------------------------------------------------------------
+    if USE_ALL_WEIGHTS:
+        weights_to_run = used_weights
+    else:
+        weights_to_run = [0]
+
     # ============================================================
     # LOOP OVER REQUESTED WEIGHT INDICES
     # ============================================================
 
-    for requested_widx in used_weights:
+    for requested_widx in weights_to_run:
 
         mytree.GetEntry(0)
         wvec_len = len(mytree.weightvec)
 
-        # Default assumptions
         effective_widx = 0
         wname = "Default"
 
-        # Use requested weight if valid
         if requested_widx in idx_to_name and requested_widx < wvec_len:
             effective_widx = requested_widx
             wname = idx_to_name[requested_widx]
@@ -142,9 +162,6 @@ for SignalSample in SignalSamples:
             "recreate"
         )
 
-        # --------------------------------------------------------
-        # Store metadata inside file
-        # --------------------------------------------------------
         ROOT.TNamed("RequestedWeightIndex", str(requested_widx)).Write()
         ROOT.TNamed("EffectiveWeightIndex", str(effective_widx)).Write()
         ROOT.TNamed("EffectiveWeightName", wname).Write()
@@ -153,10 +170,14 @@ for SignalSample in SignalSamples:
         # --------------------------------------------------------
         # Histograms
         # --------------------------------------------------------
+
         h_ptlep = ROOT.TH1F("ptlepton","ptlepton",30,0,300)
         h_ptjet = ROOT.TH1F("ptjet","ptjet",30,0,300)
-        h_etalep = ROOT.TH1F("etalepton","etalepton",24,-3,3)
-        h_etajet = ROOT.TH1F("etajet","etajet",24,-3,3)
+
+        # --- Custom eta binning ---
+        h_etalep = ROOT.TH1F("etalepton","etalepton",len(binArray)-1, binArray)
+        h_etajet = ROOT.TH1F("etajet","etajet",len(binArray)-1, binArray)
+
         h_philep = ROOT.TH1F("philepton","philepton",100,-5,10)
         h_phijet = ROOT.TH1F("phijet","phijet",100,-5,10)
         h_met = ROOT.TH1F("met_et","met_et",30,0,300)
@@ -174,7 +195,6 @@ for SignalSample in SignalSamples:
 
             weightxs = (1.0 / allevents) * event.weightvec[effective_widx]
 
-            # Selection cuts
             if event.met_et <= 25:
                 continue
             if event.leptons_pt <= 20:
@@ -186,7 +206,10 @@ for SignalSample in SignalSamples:
             final_weight = corr * weightxs
 
             h_ptlep.Fill(event.leptons_pt, final_weight)
-            h_etalep.Fill(event.leptons_eta, final_weight)
+
+            # --- Fill using fabs(eta) ---
+            h_etalep.Fill(ROOT.TMath.Abs(event.leptons_eta), final_weight)
+
             h_met.Fill(event.met_et, final_weight)
 
             dphi = abs(event.leptons_phi - event.met_phi)
@@ -195,8 +218,12 @@ for SignalSample in SignalSamples:
             h_mtw.Fill(mtw, final_weight)
 
             for jet in range(len(event.jet_pt)):
+
                 h_ptjet.Fill(event.jet_pt[jet], final_weight)
-                h_etajet.Fill(event.jet_eta[jet], final_weight)
+
+                # --- Fill jet eta with fabs ---
+                h_etajet.Fill(ROOT.TMath.Abs(event.jet_eta[jet]), final_weight)
+
                 h_phijet.Fill(event.jet_phi[jet], final_weight)
 
         outputfile.Write()
