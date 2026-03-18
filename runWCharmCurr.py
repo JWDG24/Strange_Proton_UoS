@@ -17,7 +17,7 @@ import sys
 import os
 from array import array
 
-WEIGHT_DIR = "/mnt/c/Users/dugar/wcharm_analysis/weights"
+## Boolean Switches ##
 
 # ------------------------------------------------------------
 # --- Weight configuration switch ---
@@ -26,18 +26,83 @@ WEIGHT_DIR = "/mnt/c/Users/dugar/wcharm_analysis/weights"
 # ------------------------------------------------------------
 USE_ALL_WEIGHTS = False
 
+# ------------------------------------------------------------
+# --- Eta binning switch ---
+# True  → use variable (Kristin) bins
+# False → use regular equidistant bins
+# ------------------------------------------------------------
+USE_VARIABLE_ETA_BINS = True
+
+
+## Bins ##
+
+# ------------------------------------------------------------
+# Bin Lists
+# (Phi works with uniform binning)
+# ------------------------------------------------------------
+
+# Lepton Pseudorapidity Bins (h_etalep)
+eta_lepton_bins = sorted([0, 0.21, 0.42, 0.63, 0.84, 1.05, 1.37, 1.52, 1.74, 1.95, 2.18, 2.5])
+eta_lepton_binArray = array('d', eta_lepton_bins)
+
+# Missing Transverse Energy Bins (h_met)
+met_bins = [
+    0,
+    10, 20, 25, 30, 35, 40, 45,
+    50, 52, 55, 58, 60, 62, 65, 68, 70, 72, 75, 78, 80,
+    85, 90, 100,
+    120, 140, 160,
+    200, 250, 300
+]
+met_binArray = array('d', met_bins)
+
+# W Boson Transverse Mass Energy Bins (h_mtw)
+mtw_bins = [
+    0,
+    10, 20, 30, 40,
+    45, 50, 55, 58,
+    60, 62, 65, 68,
+    70, 72, 75, 78,
+    80, 82, 85, 88, 90,
+    95, 100, 110,
+    120, 140, 160,
+    200, 300
+]
+mtw_binArray = array('d', mtw_bins)
+
+# Jet Transverse Momentum Bins (h_ptjet)
+ptjet_bins = [
+    0,
+    10, 20, 30, 40, 50, 60, 70, 80,
+    90, 100, 110, 120,
+    130, 140, 150,
+    160, 170, 180,
+    200, 220,
+    240, 260,
+    280, 300
+]
+ptjet_binArray = array('d', ptjet_bins)
+
+# Letpon Transverse Momentum Bins (h_ptlepton)
+ptlepton_bins = [
+    0,
+    6, 12, 18, 24, 30, 36, 42, 48, 54,
+    60, 66, 72, 78, 84, 90, 96, 102, 108, 114,
+    120,
+    150, 180, 210, 240, 270, 300
+]
+ptlepton_binArray = array('d', ptlepton_bins)
+
+# Jet and Lepton  Azimuthal Angles (h_phijet/philep)
+    # These are fine for uniform binning as they are just angles so please see the binning code for the bins.
+
+## Weighting Information ##
+WEIGHT_DIR = "/mnt/c/Users/dugar/wcharm_analysis/weights"
+
 # Requested weight indices
 used_weights = [0, 292, 293, 314, 315]
 
-
-# ------------------------------------------------------------
-# --- Kristin eta binning implementation ---
-# Variable bin edges for |eta|
-# Histogram will be filled with fabs(eta)
-# ------------------------------------------------------------
-bins = sorted([0, 0.21, 0.42, 0.63, 0.84, 1.05, 1.37, 1.52, 1.74, 1.95, 2.18, 2.5])
-binArray = array('d', bins)
-
+## CODE ##
 
 # ------------------------------------------------------------
 # Load clean mapping file
@@ -167,25 +232,33 @@ for SignalSample in SignalSamples:
         ROOT.TNamed("EffectiveWeightName", wname).Write()
         ROOT.TNamed("WeightVecLength", str(wvec_len)).Write()
 
-        # --------------------------------------------------------
-        # Histograms
-        # --------------------------------------------------------
+        ## --------------------------------------------------------
+        ## Histograms
+        ## --------------------------------------------------------
 
-        h_ptlep = ROOT.TH1F("ptlepton","ptlepton",30,0,300)
-        h_ptjet = ROOT.TH1F("ptjet","ptjet",30,0,300)
+        h_ptlep = ROOT.TH1F("ptlepton","ptlepton",len(ptlepton_binArray)-1, ptlepton_binArray)
+        h_ptjet = ROOT.TH1F("ptjet","ptjet",len(ptjet_binArray)-1, ptjet_binArray)
 
-        # --- Custom eta binning ---
-        h_etalep = ROOT.TH1F("etalepton","etalepton",len(binArray)-1, binArray)
-        h_etajet = ROOT.TH1F("etajet","etajet",len(binArray)-1, binArray)
+        if USE_VARIABLE_ETA_BINS:
+            h_etalep = ROOT.TH1F("etalepton", "etalepton", len(eta_lepton_binArray)-1, eta_lepton_binArray)
+            h_etajet = ROOT.TH1F("etajet", "etajet", len(eta_lepton_binArray)-1, eta_lepton_binArray)
+        else:
+            h_etalep = ROOT.TH1F("etalepton", "etalepton", 12, 0, 2.5)
+            h_etajet = ROOT.TH1F("etajet", "etajet", 12, 0, 2.5)
 
-        h_philep = ROOT.TH1F("philepton","philepton",100,-5,10)
-        h_phijet = ROOT.TH1F("phijet","phijet",100,-5,10)
-        h_met = ROOT.TH1F("met_et","met_et",30,0,300)
-        h_mtw = ROOT.TH1F("mtw","mtw",30,0,300)
+        h_philep = ROOT.TH1F("philepton","philepton",50,-1,7)
+        h_phijet = ROOT.TH1F("phijet","phijet",50,-1,7)
+
+        h_met = ROOT.TH1F("met_et","met_et",len(met_binArray)-1, met_binArray)
+        h_mtw = ROOT.TH1F("mtw","mtw",len(mtw_binArray)-1, mtw_binArray)
 
         for h in [h_ptlep, h_ptjet, h_etalep, h_etajet,
                   h_philep, h_phijet, h_met, h_mtw]:
             h.Sumw2()
+
+        ## Double Value Checker ##
+        pos_eta_sum = 0.0
+        neg_eta_sum = 0.0
 
         # ============================================================
         # EVENT LOOP
@@ -205,10 +278,21 @@ for SignalSample in SignalSamples:
             corr = -1 * event.leptons_charge
             final_weight = corr * weightxs
 
-            h_ptlep.Fill(event.leptons_pt, final_weight)
+            ## Consistent Eta Handling ##
+            eta_lep = abs(event.leptons_eta)
 
-            # --- Fill using fabs(eta) ---
-            h_etalep.Fill(ROOT.TMath.Abs(event.leptons_eta), final_weight)
+            ## Double Value Checker ##
+            if event.leptons_eta >= 0:
+                pos_eta_sum += final_weight
+            else:
+                neg_eta_sum += final_weight
+
+            h_ptlep.Fill(event.leptons_pt, final_weight)
+            
+            h_philep.Fill(event.leptons_phi, final_weight)
+
+            ## Consistent Eta Handling ##
+            h_etalep.Fill(eta_lep, final_weight)
 
             h_met.Fill(event.met_et, final_weight)
 
@@ -221,10 +305,17 @@ for SignalSample in SignalSamples:
 
                 h_ptjet.Fill(event.jet_pt[jet], final_weight)
 
-                # --- Fill jet eta with fabs ---
-                h_etajet.Fill(ROOT.TMath.Abs(event.jet_eta[jet]), final_weight)
+                ## Consistent Eta Handling ##
+                eta_jet = abs(event.jet_eta[jet])
+                h_etajet.Fill(eta_jet, final_weight)
 
                 h_phijet.Fill(event.jet_phi[jet], final_weight)
+
+        ## Double Value Checker ##
+        print(f"  +eta weight sum: {pos_eta_sum}")
+        print(f"  -eta weight sum: {neg_eta_sum}")
+        if neg_eta_sum != 0:
+            print(f"  Ratio (+/-): {pos_eta_sum / neg_eta_sum}")
 
         outputfile.Write()
         outputfile.Close()

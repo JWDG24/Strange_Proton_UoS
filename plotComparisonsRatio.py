@@ -20,6 +20,8 @@ histo_titles = {
     "met_et": "Missing Transverse Energy",
     "mtw": "W Boson Transverse Mass",
     "ptjet": "Jet Transverse Momentum",
+    "philepton": "Lepton Azimuthal Angle",
+    "phijet": "Jet Azimuthal Angle",
 }
 
 x_axis_labels = {
@@ -28,6 +30,8 @@ x_axis_labels = {
     "met_et": "E_{T}^{miss} [GeV]",
     "mtw": "m_{T}^{W} [GeV]",
     "ptjet": "p_{T}^{jet} [GeV]",
+    "philepton": "#phi^{lepton}",
+    "phijet": "#phi^{jet}",
 }
 
 valid_pairs = [
@@ -37,10 +41,9 @@ valid_pairs = [
     ("WCPy8plus",      "WCPyPartonplus"),
 ]
 
-# Updated colour scheme (Herwig plus now GREEN)
 pair_colours = {
     ("WCH7minus", "WCHPartonminus"): ROOT.kBlue,
-    ("WCH7plus", "WCHPartonplus"): ROOT.kGreen+2,   # <-- changed from kAzure+2
+    ("WCH7plus", "WCHPartonplus"): ROOT.kGreen+2,
     ("WCPy8minus", "WCPyPartonminus"): ROOT.kRed,
     ("WCPy8plus", "WCPyPartonplus"): ROOT.kMagenta+1,
 }
@@ -122,9 +125,21 @@ for histo in histo_titles:
         if h_particle.Integral() == 0:
             continue
 
+        # --------------------------------------------------------
+        # Bin width normalisation (IMPORTANT for variable bins)
+        # This ensures histograms represent density, not raw counts
+        # Prevents bias when dividing histograms with different bin widths
+        # --------------------------------------------------------
+        h_particle.Scale(1.0, "width")
+        h_parton.Scale(1.0, "width")
+        # --------------------------------------------------------
+
         ratio = h_parton.Clone(f"ratio_{parton}_over_{particle}")
         ROOT.SetOwnership(ratio, False)
 
+        # --------------------------------------------------------
+        # Compute ratio: Parton / Particle
+        # --------------------------------------------------------
         ratio.Divide(h_particle)
 
         ratio.SetLineWidth(2)
@@ -133,6 +148,19 @@ for histo in histo_titles:
         ratio.SetMarkerColor(pair_colours[(particle, parton)])
         ratio.SetMinimum(0.0)
         ratio.SetMaximum(1.2)
+
+        # --------------------------------------------------------
+        # Auto axis tightening (remove empty space)
+        # --------------------------------------------------------
+        ratio.GetXaxis().SetLimits(
+            ratio.GetXaxis().GetXmin(),
+            ratio.GetXaxis().GetXmax()
+        )
+
+        max_val = ratio.GetMaximum()
+        if max_val > 0:
+            ratio.SetMaximum(1.2 * max_val)
+        # --------------------------------------------------------
 
         ratio.SetTitle(
             f"{histo_titles[histo]} "
