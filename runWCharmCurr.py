@@ -90,7 +90,7 @@ ptlepton_bins = [
     60, 66, 72, 78, 84, 90, 96, 102, 108, 114,
     120,
     150, 180, 210, 240, 270, 300
-]
+    ]
 ptlepton_binArray = array('d', ptlepton_bins)
 
 # Jet and Lepton  Azimuthal Angles (h_phijet/philep)
